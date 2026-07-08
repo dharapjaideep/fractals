@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractals 🎵 — Invite only</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #b3b3b3;
+            margin-top: 0.4rem;
+            font-size: 0.95rem;
+        }
+
+        /* ── Alpha badge ──────────────────────────────────── */
+        .alpha-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: #2a2a2a;
+            color: #1DB954;
+            border: 1px solid #1DB954;
+            vertical-align: middle;
+            margin-left: 10px;
+            cursor: default;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .invite-only-view {
+            text-align: center;
+            padding-top: 3rem;
+        }
+
+        .invite-only-message {
+            font-size: 1.05rem;
+            color: #b3b3b3;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .back-link {
+            color: #1DB954;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover { text-decoration: underline; }
+
+        .account-note {
+            margin-top: 2rem;
+            padding: 1rem 1.25rem;
+            background: #282828;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: #b3b3b3;
+            line-height: 1.5;
+        }
+
+        .account-note a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+
+        .account-note a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Fractals 🎵<span class="alpha-badge" title="Early alpha — core recommendation engine works but expect rough edges. Your feedback helps shape what this becomes.">Alpha</span></h1>
+            <p class="subtitle">Discover music that means something to you</p>
+        </header>
+
+        <div class="invite-only-view">
+            <p class="invite-only-message">
+                This is an early alpha — we're testing with a small group of music lovers right now.
+                <br><br>
+                Please check back soon.
+            </p>
+
+            <div class="account-note">
+                To sign in with a different account, log out of Spotify first at
+                <a href="https://open.spotify.com" target="_blank" rel="noopener">open.spotify.com</a>,
+                then return here to sign in.
+            </div>
+
+            <a href="/" class="back-link">← Back</a>
+        </div>
+    </div>
+</body>
+</html>

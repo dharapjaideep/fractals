@@ -1,0 +1,7 @@
+target/
+.idea/
+*.iml
+.env
+tmp/
+.compound-engineering/*.local.yaml
+.claude/settings.local.json

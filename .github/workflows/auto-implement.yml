@@ -1,0 +1,81 @@
+name: Auto-Implementer
+
+on:
+  workflow_call:
+    inputs:
+      report_path:
+        type: string
+        required: true
+        description: "Path to the review report to act on"
+  workflow_dispatch:
+    inputs:
+      report_path:
+        type: string
+        required: true
+        description: "Path to the review report to act on"
+
+# pull-requests: write lives here, not in code-review.yml, because only the
+# Auto-Implementer Agent calls `gh pr create`. The Review Agent in
+# code-review.yml only commits the report — it never opens a PR — so it keeps
+# the narrower contents: write-only scope (least privilege).
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-implement:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: devel
+          fetch-depth: 0   # full history needed for git log / branch creation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install Claude Code
+        # Pinned to the last known-good version — 2.1.190/2.1.191 introduced a regression
+        # where `git push` gets gated/denied in headless (-p) mode even when it matches an
+        # --allowedTools pattern (git checkout/add/commit were unaffected). Investigate the
+        # changelog before bumping past this version.
+        run: npm install -g @anthropic-ai/claude-code@2.1.187
+
+      - name: Configure git for agent commits
+        run: |
+          git config --global user.name "Auto-Implementer Agent"
+          git config --global user.email "agent@noreply.github.com"
+
+      # Auto-Implementer: broader permissions than Review Agent because it
+      # needs to write source files and open PRs. Scoped to src/* writes
+      # only — cannot touch workflows, agent definitions, or CLAUDE.md.
+      - name: Run Auto-Implementer Agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ALLOWED_TOOLS="Read,Write(src/*),Write(reports/*),Write(FIXES.md)"
+          ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(mvn compile),Bash(mvn test)"
+          ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(git checkout *),Bash(git add *)"
+          # TEMPORARY: broadened from Bash(git push origin fix/*) to confirm the -u flag
+          # is what's breaking the allowlist match. The agent issues `git push -u origin fix/...`
+          # but the narrower pattern only matches `git push origin ...`. Tighten back once confirmed.
+          ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(git commit *),Bash(git push *)"
+          ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(gh pr create *),Bash(echo *),Bash(ls *),Bash(grep *)"
+
+          claude -p "$(cat .claude/agents/auto-implementer.md)
+
+          The review report to act on is at: ${{ inputs.report_path }}" \
+            --allowedTools "$ALLOWED_TOOLS" \
+            --permission-mode acceptEdits \
+            --max-turns 50

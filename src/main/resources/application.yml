@@ -1,0 +1,74 @@
+spring:
+  main:
+    web-application-type: servlet   # force servlet mode even with WebFlux on classpath
+  security:
+    oauth2:
+      client:
+        registration:
+          spotify:
+            client-id: ${SPOTIFY_CLIENT_ID}
+            client-secret: ${SPOTIFY_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/spotify"
+            # playlist-modify-private: required for save_to_playlist
+            # Remove if that feature is disabled
+            scope: >-
+              user-read-private,user-read-email,
+              playlist-read-private,user-top-read,playlist-modify-private
+        provider:
+          spotify:
+            authorization-uri: https://accounts.spotify.com/authorize
+            token-uri: https://accounts.spotify.com/api/token
+            user-info-uri: https://api.spotify.com/v1/me
+            user-name-attribute: id
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+  sql:
+    init:
+      mode: never
+  ai:
+    mcp:
+      server:
+        name: spotify-recommender-mcp
+        version: 1.0.0
+        type: SYNC
+        protocol: STREAMABLE   # confirmed enum value in spring-ai 1.1.8: SSE | STREAMABLE | STATELESS
+        streamable-http:
+          mcp-endpoint: /mcp   # matches the confirmed default; stated explicitly for clarity
+
+server:
+  # Honour X-Forwarded-Proto/Host/Port so the OAuth2 "{baseUrl}" redirect URI resolves the
+  # external https host behind a TLS-terminating reverse proxy. Without this, a prod deploy
+  # silently emits a plain-HTTP / internal-host callback that won't match the registered
+  # Spotify redirect URI (fail-safe: avoid silent degradation). No-op in local dev (no proxy).
+  forward-headers-strategy: framework
+
+spotify:
+  api:
+    base-url: https://api.spotify.com/v1
+
+anthropic:
+  # No default: a missing ANTHROPIC_API_KEY must fail fast at startup (fail-closed) rather than
+  # booting with a blank key and silently degrading to empty recommendations at the first request.
+  # Mirrors the SPOTIFY_CLIENT_ID/SECRET placeholders, which also have no default.
+  api-key: ${ANTHROPIC_API_KEY}
+  model: claude-sonnet-4-6
+  max-tokens: 1000
+
+fractals:
+  prompt:
+    # Playlist reasoning instructions. Set via PROMPT_REASONING_INSTRUCTIONS env var to keep
+    # production reasoning out of the public repository. Falls back to a generic instruction if unset.
+    reasoning-instructions: ${PROMPT_REASONING_INSTRUCTIONS:}
+  rag:
+    # Number of tracks returned by semantic retrieval per chat request.
+    # Must be >= 5 for RAG context to activate (below that threshold the service
+    # falls back to the existing top-10 tracks signal).
+    top-k: 35
+    # Embedding batch size for library crawl. Keeps error isolation to 100 tracks
+    # per failed OpenAI call vs the full library, while staying well under the
+    # 2048-input and 8192-token limits of text-embedding-3-small.
+    batch-size: 100

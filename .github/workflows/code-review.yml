@@ -1,0 +1,117 @@
+name: Code Review Agent
+
+on:
+  workflow_dispatch:       # allows manual trigger from GitHub UI
+
+concurrency:
+  group: code-review
+  cancel-in-progress: false
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write      # needed to commit the report back
+
+    outputs:
+      has_high: ${{ steps.check_high.outputs.has_high }}
+      report_path: ${{ steps.get_report.outputs.report_path }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: devel
+          fetch-depth: 0   # full history needed for git log
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install Claude Code
+        # Pinned to the last known-good version — see auto-implement.yml for why.
+        run: npm install -g @anthropic-ai/claude-code@2.1.187
+
+      - name: Configure git for agent commits
+        run: |
+          git config --global user.name "Code Review Agent"
+          git config --global user.email "agent@noreply.github.com"
+
+      # Least privilege: Agent may only read files, write to reports/,
+      # and run git commands needed to commit the report.
+      # It cannot run arbitrary shell commands or edit source files.
+      - name: Run code review agent
+        id: run_code_review_agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "$(cat .claude/agents/code-review.md)" \
+            --allowedTools "Read,Write(reports/*),Bash(git log *),Bash(git add reports/*),Bash(git commit *),Bash(git diff *)" \
+            --permission-mode acceptEdits \
+            --max-turns 30
+
+      - name: Push report to repository
+        if: steps.run_code_review_agent.outcome == 'success' ||
+            steps.run_code_review_agent.outcome == 'failure'
+        run: |
+          git push origin devel
+
+      - name: Get report path
+        id: get_report
+        run: |
+          # Strict YYYY-MM-DD-HHMM-review.md glob only — deliberately excludes
+          # older un-timestamped report files (e.g. YYYY-MM-DD-review.md,
+          # YYYY-MM-DD-review-<suffix>.md) so they can never be mistaken for
+          # the report this run just wrote. Lexicographic sort is reliable
+          # within this fixed-width format: a later run's filename always
+          # sorts greater than an earlier run's on the same day. `ls -t`
+          # (mtime-based) was unreliable here because a fresh checkout gives
+          # every file the same mtime, so "most recently modified" doesn't
+          # mean "most recently committed".
+          REPORT=$(ls reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]-review.md 2>/dev/null | sort -r | head -1)
+          if [ -z "$REPORT" ]; then
+            echo "report_path=" >> $GITHUB_OUTPUT
+          else
+            echo "report_path=$REPORT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for HIGH findings
+        id: check_high
+        run: |
+          REPORT=$(ls reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]-review.md 2>/dev/null | sort -r | head -1)
+          if [ -z "$REPORT" ]; then
+            echo "has_high=false" >> $GITHUB_OUTPUT
+          elif grep -qE "^\s*-?\s*\*\*HIGH" "$REPORT" 2>/dev/null; then
+            echo "has_high=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_high=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Calling a reusable workflow (`uses:`) is only valid as a job-level key in
+  # GitHub Actions, not as a step inside another job — so triggering
+  # auto-implement.yml runs as its own job that depends on code-review's
+  # outputs, rather than as a step within the code-review job.
+  trigger-auto-implement:
+    needs: code-review
+    if: needs.code-review.outputs.has_high == 'true'
+    # A reusable workflow can never be granted more than its caller already
+    # has — auto-implement.yml requests contents:write + pull-requests:write,
+    # so this job must hold that same scope to pass it down. code-review's
+    # own job keeps the narrower contents:write-only scope; this job carries
+    # the broader one only because forwarding to the Auto-Implementer is its
+    # sole purpose.
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/auto-implement.yml
+    with:
+      report_path: ${{ needs.code-review.outputs.report_path }}
+    secrets: inherit

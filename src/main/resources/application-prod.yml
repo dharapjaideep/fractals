@@ -1,0 +1,19 @@
+# Railway deployment profile — PG* variables are auto-injected by Railway's
+# Postgres plugin; they're not something you set manually in Railway's env config.
+spring:
+  datasource:
+    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
+    username: ${PGUSER}
+    password: ${PGPASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    root: WARN
+    com.spotify.recommender: INFO

@@ -1,0 +1,33 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          spotify:
+            # Dev-only literal redirect URI. The base profile uses "{baseUrl}/..." so
+            # deployed environments resolve their own host; local dev must use 127.0.0.1
+            # (not localhost) to match the registered Spotify redirect URI — see CLAUDE.md.
+            redirect-uri: "http://127.0.0.1:8080/login/oauth2/code/spotify"
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fractals
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    defer-datasource-initialization: true   # schema.sql runs before Hibernate validation
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  sql:
+    init:
+      mode: always   # must stay "always" — schema.sql creates oauth2_authorized_client,
+                      # which has no JPA entity, so ddl-auto can't create it
+
+logging:
+  level:
+    com.spotify.recommender: INFO
+    org.springframework.security: DEBUG
+    org.springframework.web.reactive.function.client: DEBUG
