@@ -123,6 +123,10 @@ public class PlaceholderService {
             MessageCreateParams params = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(maxTokens)
+                .system("You are a music personalization assistant. " +
+                        "Generate short, evocative placeholder text " +
+                        "for a music discovery interface. " +
+                        "Only generate music-related content.")
                 .addUserMessage(prompt)
                 .build();
             Message message = anthropicClient.messages().create(params);

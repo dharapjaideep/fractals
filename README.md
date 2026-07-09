@@ -62,10 +62,10 @@ not just a generic playlist.
 Spotify knows what you've listened to. Fractals 
 understands why it resonated — and tries to find 
 more music that does.
-
+[review-log.md](reports/review-log.md)
 ## How it works
 
-User logs in via Spotify OAuth2, then sends a 
+User logs in via Spotify OAuth2, then sends a [review-log.md](reports/review-log.md)
 plain-text query. The service fetches music context 
 from Spotify (top tracks, playlist contents), 
 constructs a prompt combining that context with 

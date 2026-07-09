@@ -71,7 +71,7 @@ public class SecurityConfig {
                 // to SpotifyMcpTools.java requires re-evaluating this exemption —
                 // without CSRF protection, a cross-site request could trigger write
                 // operations using a victim's session cookie.
-                .ignoringRequestMatchers("/h2-console/**", "/mcp/**"))
+                .ignoringRequestMatchers("/mcp/**"))
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
@@ -87,7 +87,7 @@ public class SecurityConfig {
                     AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/*.css"),
                     AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/*.js")
                 ).permitAll()
-                .requestMatchers("/oauth2/**", "/login/**", "/h2-console/**").permitAll()
+                .requestMatchers("/oauth2/**", "/login/**").permitAll()
                 // Functionally already covered by anyRequest().authenticated() below;
                 // stated explicitly per CLAUDE.md's least-privilege principle so the
                 // MCP endpoint's required permission is visible at this call site.
@@ -116,9 +116,6 @@ public class SecurityConfig {
                 // the fetch completes, so the user sees a clear confirmation page rather
                 // than being silently redirected to "/" which may auto-trigger Spotify login.
                 .logoutSuccessHandler((req, res, auth) -> res.setStatus(200)));
-
-        // Allow H2 console iframes in dev
-        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
         // Re-register CsrfCookieFilter so the XSRF-TOKEN cookie is written on every response.
         // With CsrfTokenRequestAttributeHandler (deferred), safe GETs never touch the token, so

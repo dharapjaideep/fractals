@@ -126,23 +126,6 @@ public class RecommendationService {
 
         List<RankedTrack> ranked = resolveTracks(suggestions, request.getLimit());
 
-        // TEMPORARY: auto-save until frontend REST endpoint
-        // is implemented. NOTE: this makes get_recommendations
-        // a write operation called via the CSRF-exempt /mcp/**
-        // endpoint — acceptable for local dev only, must be
-        // removed before any deployment. See SecurityConfig.java
-        // CSRF exemption comment.
-        try {
-            List<String> uris = ranked.stream()
-                .map(rt -> rt.getTrack().getUri())
-                .toList();
-            if (!uris.isEmpty()) {
-                saveToPlaylist(uris, playlistName, snapshot);
-            }
-        } catch (RuntimeException e) {
-            log.warn("Auto-save to playlist failed; continuing without saving", e);
-        }
-
         return new RecommendationResponse(ranked, ranked.size());
     }
 

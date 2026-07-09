@@ -67,10 +67,7 @@ jobs:
           ALLOWED_TOOLS="Read,Write(src/*),Write(reports/*),Write(FIXES.md)"
           ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(mvn compile),Bash(mvn test)"
           ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(git checkout *),Bash(git add *)"
-          # TEMPORARY: broadened from Bash(git push origin fix/*) to confirm the -u flag
-          # is what's breaking the allowlist match. The agent issues `git push -u origin fix/...`
-          # but the narrower pattern only matches `git push origin ...`. Tighten back once confirmed.
-          ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(git commit *),Bash(git push *)"
+          ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(git commit *),Bash(git push -u origin fix/*)"
           ALLOWED_TOOLS="$ALLOWED_TOOLS,Bash(gh pr create *),Bash(echo *),Bash(ls *),Bash(grep *)"
 
           claude -p "$(cat .claude/agents/auto-implementer.md)
