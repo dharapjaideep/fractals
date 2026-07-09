@@ -143,7 +143,10 @@ public class SpotifyMcpTools {
         request.setMoodTarget(moodTarget);
         request.setEnergyBoost(energyBoost);
         try {
-            RecommendationResponse response = recommendationService.recommend(request);
+            // persistToPlaylist=false: this tool is exposed over the CSRF-exempt /mcp/** endpoint
+            // and MUST remain read-only, so recommendations are never auto-saved to the user's
+            // Spotify account here. Auto-save is REST-only (see RecommendationService).
+            RecommendationResponse response = recommendationService.recommend(request, false);
             return response.getTracks().stream()
                 .map(SpotifyMcpTools::toMcpRecommendation)
                 .collect(Collectors.toList());

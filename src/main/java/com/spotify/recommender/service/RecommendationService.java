@@ -32,8 +32,9 @@ import java.util.stream.Collectors;
  * <p>Orchestrates the full recommendation flow: fetches the user's top tracks,
  * builds a structured prompt for Claude with optional mood/energy context and
  * existing-playlist exclusions, parses the JSON suggestions returned by Claude,
- * resolves each suggestion against the Spotify catalogue, and auto-saves resolved
- * tracks to a mood-named playlist.
+ * resolves each suggestion against the Spotify catalogue, and (on the REST path only)
+ * auto-saves resolved tracks to a mood-named playlist. The read-only MCP path never
+ * writes — see {@link #recommend(RecommendationRequest, boolean)}.
  *
  * <p>All external calls are individually fail-safe: failures degrade gracefully
  * (empty snapshot, empty track list) rather than surfacing exceptions to callers.
@@ -73,12 +74,13 @@ public class RecommendationService {
     }
 
     /**
-     * Generates personalised track recommendations for the authenticated user.
+     * Generates personalised track recommendations for the authenticated user and auto-saves
+     * them to the user's mood-named Spotify playlist.
      *
-     * <p>Fetches the user's top tracks, determines the target playlist by mood,
-     * calls Claude with the assembled prompt, parses the suggestions, resolves
-     * them against Spotify, and auto-saves to the mood playlist. Each step
-     * degrades gracefully on failure rather than throwing.
+     * <p>This is the REST entry point. Auto-save is a deliberate REST-only UX decision
+     * (see CLAUDE.md) and is safe here because {@code POST /api/recommendations} is
+     * CSRF-protected. The read-only MCP path must instead call
+     * {@link #recommend(RecommendationRequest, boolean)} with {@code persistToPlaylist=false}.
      *
      * @param request recommendation parameters (mood, energy boost, limit); may be null
      *                (defaults are applied)
@@ -86,17 +88,52 @@ public class RecommendationService {
      *         returns an empty response if top tracks cannot be fetched or Claude fails
      */
     public RecommendationResponse recommend(RecommendationRequest request) {
-        log.debug("recommend() called");
+        return recommend(request, true);
+    }
+
+    /**
+     * Generates personalised track recommendations, optionally auto-saving them to the user's
+     * mood-named Spotify playlist.
+     *
+     * <p>Fetches the user's top tracks, determines the target playlist by mood,
+     * calls Claude with the assembled prompt, parses the suggestions, resolves
+     * them against Spotify, and — only when {@code persistToPlaylist} is true —
+     * creates/updates the mood playlist. Each step degrades gracefully on failure
+     * rather than throwing.
+     *
+     * <p><strong>Security:</strong> when {@code persistToPlaylist} is false, no playlist is
+     * created or modified — {@code getOrCreatePlaylist} and {@code addTracksToPlaylist} are
+     * never reached. This is what keeps the MCP {@code get_recommendations} tool read-only:
+     * that tool is served from the CSRF-exempt {@code /mcp/**} endpoint (see
+     * {@code SecurityConfig}), so it must have no write side effects. A CSRF-exempt path that
+     * mutates the user's account would defeat the exact invariant the exemption relies on.
+     *
+     * @param request           recommendation parameters (mood, energy boost, limit); may be null
+     * @param persistToPlaylist true to auto-save (REST path); false for the read-only MCP path
+     * @return a {@link RecommendationResponse} containing ranked tracks and the total count
+     */
+    public RecommendationResponse recommend(RecommendationRequest request, boolean persistToPlaylist) {
+        log.debug("recommend() called (persistToPlaylist={})", persistToPlaylist);
         if (request == null) request = new RecommendationRequest();
 
-        List<TrackDto> topTracks = spotifyApi.getTopTracks("medium_term", 10).getItems();
+        // Fail-safe: getTopTracks (or its page) may be null on an upstream failure. Treat any
+        // missing data as "no tracks" rather than letting a NullPointerException escape — the
+        // class contract is that every external call degrades gracefully to an empty result.
+        SpotifyPage<TrackDto> topTracksPage = spotifyApi.getTopTracks("medium_term", 10);
+        List<TrackDto> topTracks = (topTracksPage != null && topTracksPage.getItems() != null)
+            ? topTracksPage.getItems() : List.of();
         if (topTracks.isEmpty()) {
             log.warn("getTopTracks returned no tracks; cannot build a recommendation prompt");
             return new RecommendationResponse(List.of(), 0);
         }
 
         String playlistName = playlistNameForMood(request.getMoodTarget());
-        PlaylistSnapshot snapshot = fetchPlaylistSnapshot(playlistName);
+        // Only touch the user's playlist when persisting. On the read-only MCP path we must not
+        // even create the playlist (getOrCreatePlaylist is a write), so skip the snapshot and
+        // proceed with no exclusions rather than mutating the account.
+        PlaylistSnapshot snapshot = persistToPlaylist
+            ? fetchPlaylistSnapshot(playlistName)
+            : new PlaylistSnapshot(null, List.of(), 0);
 
         String responseText;
         try {
@@ -126,21 +163,20 @@ public class RecommendationService {
 
         List<RankedTrack> ranked = resolveTracks(suggestions, request.getLimit());
 
-        // TEMPORARY: auto-save until frontend REST endpoint
-        // is implemented. NOTE: this makes get_recommendations
-        // a write operation called via the CSRF-exempt /mcp/**
-        // endpoint — acceptable for local dev only, must be
-        // removed before any deployment. See SecurityConfig.java
-        // CSRF exemption comment.
-        try {
-            List<String> uris = ranked.stream()
-                .map(rt -> rt.getTrack().getUri())
-                .toList();
-            if (!uris.isEmpty()) {
-                saveToPlaylist(uris, playlistName, snapshot);
+        // Auto-save is REST-only. It is intentionally skipped on the read-only MCP path
+        // (persistToPlaylist=false) so that get_recommendations, reachable via the CSRF-exempt
+        // /mcp/** endpoint, performs no write. See the class Javadoc and SecurityConfig.
+        if (persistToPlaylist) {
+            try {
+                List<String> uris = ranked.stream()
+                    .map(rt -> rt.getTrack().getUri())
+                    .toList();
+                if (!uris.isEmpty()) {
+                    saveToPlaylist(uris, playlistName, snapshot);
+                }
+            } catch (RuntimeException e) {
+                log.warn("Auto-save to playlist failed; continuing without saving", e);
             }
-        } catch (RuntimeException e) {
-            log.warn("Auto-save to playlist failed; continuing without saving", e);
         }
 
         return new RecommendationResponse(ranked, ranked.size());

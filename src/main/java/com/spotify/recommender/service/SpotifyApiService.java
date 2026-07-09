@@ -264,14 +264,25 @@ public class SpotifyApiService {
      * @return the Spotify playlist ID
      */
     public String getOrCreatePlaylist(String playlistName) {
-        List<PlaylistDto> playlists = getPlaylists(0, 50).getItems();
+        // Fail-safe: an empty/absent body from Spotify must not NPE here. Treat a missing page or
+        // item list as "no existing playlists" and fall through to creation.
+        SpotifyPage<PlaylistDto> page = getPlaylists(0, 50);
+        List<PlaylistDto> playlists = (page != null && page.getItems() != null)
+            ? page.getItems() : List.of();
         for (PlaylistDto playlist : playlists) {
             if (playlistName.equals(playlist.getName())) {
                 return playlist.getId();
             }
         }
 
-        String userId = getProfile().getId();
+        // Fail closed: without a resolved user ID we cannot create the playlist under the correct
+        // account. An explicit error is safer than dereferencing a null profile (silent NPE).
+        SpotifyUserDto profile = getProfile();
+        if (profile == null || profile.getId() == null) {
+            throw new IllegalStateException(
+                "Cannot create playlist '" + playlistName + "': Spotify profile or user ID unavailable");
+        }
+        String userId = profile.getId();
         PlaylistDto created = client.post()
             .uri("/users/{userId}/playlists", userId)
             .bodyValue(Map.of(
@@ -282,6 +293,12 @@ public class SpotifyApiService {
             .bodyToMono(PlaylistDto.class)
             .retryWhen(transientRetry())
             .block();
+        // Fail closed: a null body (or a body with no ID) means the create did not succeed as
+        // expected — surface an explicit error rather than returning/propagating a null ID.
+        if (created == null || created.getId() == null) {
+            throw new IllegalStateException(
+                "Cannot create playlist '" + playlistName + "': Spotify returned no playlist ID");
+        }
         return created.getId();
     }
 

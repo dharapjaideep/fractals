@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -60,7 +61,9 @@ class RecommendationControllerTest {
     @Test
     @WithMockUser
     void quick_returnsRankedTracks() throws Exception {
-        when(recommendationService.recommend(any())).thenReturn(sampleResponse());
+        // /quick is read-only: it must call recommend with persistToPlaylist=false so the GET
+        // performs no auto-save (state changes must not be reachable via a CSRF-exempt GET).
+        when(recommendationService.recommend(any(), eq(false))).thenReturn(sampleResponse());
 
         mockMvc.perform(get("/api/recommendations/quick"))
             .andExpect(status().isOk())
@@ -68,6 +71,9 @@ class RecommendationControllerTest {
             .andExpect(jsonPath("$.tracks[0].track.id").value("t1"))
             .andExpect(jsonPath("$.tracks[0].score").value(0.95))
             .andExpect(jsonPath("$.total").value(1));
+
+        // Ensures the GET path never invokes the persisting overload.
+        verify(recommendationService).recommend(any(RecommendationRequest.class), eq(false));
     }
 
     @Test

@@ -37,12 +37,16 @@ public class RecommendationController {
 
     /**
      * Convenience endpoint for quick recommendations with all-default parameters.
-     * Equivalent to {@code POST /api/recommendations} with an empty request body.
+     *
+     * <p>Read-only: unlike {@code POST /api/recommendations}, this GET does not auto-save to the
+     * user's playlist. A GET must be side-effect-free — Spring applies CSRF protection only to
+     * state-changing methods, so a mutating GET would be reachable without any CSRF check. Callers
+     * that want the recommendations persisted must use the CSRF-protected POST endpoint.
      *
      * @return a {@link RecommendationResponse} containing ranked track suggestions with default settings
      */
     @GetMapping("/quick")
     public RecommendationResponse quick() {
-        return recommendationService.recommend(new RecommendationRequest());
+        return recommendationService.recommend(new RecommendationRequest(), false);
     }
 }
