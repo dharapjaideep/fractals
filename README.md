@@ -15,7 +15,7 @@ What started as a learning exercise produced
 something I didn't expect: recommendations that 
 actually surprised me. Not just "more of the same 
 genre" but genuine discoveries — artists from 
-completely different cultural traditions that shared 
+completely different genres and cultural traditions that shared 
 the same emotional DNA as music I already loved.
 
 That outcome is what this README documents.
