@@ -62,4 +62,12 @@ class GlobalExceptionHandlerTest {
             .andExpect(jsonPath("$.error").value("spotify_api_error"))
             .andExpect(jsonPath("$.status").value(503));
     }
+
+    @Test
+    @WithMockUser
+    void constraintViolationException_returns400InsteadOf500() throws Exception {
+        mockMvc.perform(get("/test/constraint-violation").param("value", "0"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("invalid_request"));
+    }
 }

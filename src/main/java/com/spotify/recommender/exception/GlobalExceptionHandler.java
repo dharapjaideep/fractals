@@ -1,5 +1,6 @@
 package com.spotify.recommender.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +17,20 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    // @Validated + @Min/@Max on @RequestParam (UserController, PlaylistController) is enforced by
+    // Spring's AOP-based MethodValidationInterceptor, which throws ConstraintViolationException
+    // directly rather than the MethodArgumentNotValidException used for @Valid @RequestBody.
+    // Without this handler the exception was uncaught, surfacing as a 500 instead of failing
+    // closed with a 400 on invalid client input.
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        log.warn("Request parameter validation failed: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(Map.of(
+                "error", "invalid_request",
+                "message", ex.getMessage()));
+    }
 
     @ExceptionHandler(SpotifyRateLimitException.class)
     public ResponseEntity<Map<String, Object>> handleRateLimit(SpotifyRateLimitException ex) {

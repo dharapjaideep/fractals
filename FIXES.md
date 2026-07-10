@@ -23,3 +23,21 @@ addressed by this fix pass. Missing tests, to be added later:
 - `src/main/java/com/spotify/recommender/config/SecurityConfig.java` *(protected file — human-reviewed and approved before writing)* — removed `/h2-console/**` from the CSRF `ignoringRequestMatchers(...)` exemption and from `permitAll()`, and removed the `frameOptions().sameOrigin()` override that existed solely to allow H2 console iframes (HIGH finding H3). Confirmed dead code: no `application*.yml` sets `spring.h2.console.enabled`, so Spring Boot's `H2ConsoleAutoConfiguration` never activates and the H2 console servlet is never registered — these matchers were exempting/permitting a path that was never actually served, creating an unnecessary security surface. `com.h2database:h2` remains a `runtime`-scope dependency in `pom.xml` (unchanged, out of scope for this fix). No test referenced H2 console or `frameOptions`.
 
 Verified with `mvn test` — 126 tests, 0 failures, 0 errors, BUILD SUCCESS.
+
+## 2026-07-10 — Remove stray review-log link from README
+
+- `README.md` — removed a stray `[review-log.md](reports/review-log.md)` line left in the "How Fractals works" section, and restored the blank line before the `## How it works` heading that the stray line had collapsed. Docs-only change, no code affected.
+
+## 2026-07-10 — Fix HIGH finding H4: add missing tests for AuthController, UserController, PlaylistController, UserService, PlaylistService
+
+- `src/test/java/com/spotify/recommender/controller/AuthControllerTest.java` (new) — covers the `/api/auth/me` 401-vs-authenticated branch (a non-`OAuth2AuthenticationToken` authenticated principal, e.g. `@WithMockUser`, now hits the controller's own 401 branch), the unauthenticated redirect, and `UserProfileDto` mapping on the success path using a constructed `OAuth2AuthenticationToken`.
+- `src/test/java/com/spotify/recommender/controller/UserControllerTest.java` (new) — covers `/api/user/profile`, `/api/user/top-tracks`, `/api/user/top-artists`: `timeRange` default (`medium_term`), `limit` default (20) and pass-through, and `@Min(1)`/`@Max(50)` validation.
+- `src/test/java/com/spotify/recommender/controller/PlaylistControllerTest.java` (new) — covers `/api/playlists` and `/api/playlists/{id}/tracks`: `offset`/`limit` defaults and pass-through, `@Min`/`@Max` validation, and delegation of the path-variable playlist ID to `PlaylistService`.
+- `src/test/java/com/spotify/recommender/service/UserServiceTest.java` (new) — covers `findBySpotifyId` on both branches: existing user returned, and the fail-closed `404 ResponseStatusException` (security-relevant path noted in H4) when no user matches.
+- `src/test/java/com/spotify/recommender/service/PlaylistServiceTest.java` (new) — covers argument/return-value pass-through delegation to `SpotifyApiService.getPlaylists`/`getPlaylistTracks`.
+
+While writing the `UserController`/`PlaylistController` validation tests, found that `@Min`/`@Max` violations on `@RequestParam`s were **not** actually producing 400 responses: Spring's AOP-based `MethodValidationInterceptor` throws `jakarta.validation.ConstraintViolationException` directly (a different mechanism than `@Valid @RequestBody`'s `MethodArgumentNotValidException`), and `GlobalExceptionHandler` had no handler for it — so invalid input like `?limit=999` was returning an uncaught 500 in production, not a 400. Fixed as part of this pass (confirmed with the user before making the change, since it's a behavior change beyond the original test-only scope):
+- `src/main/java/com/spotify/recommender/exception/GlobalExceptionHandler.java` — added `@ExceptionHandler(ConstraintViolationException.class)` returning 400 with `{"error": "invalid_request", "message": ...}`.
+- `src/test/java/com/spotify/recommender/exception/GlobalExceptionTestController.java` / `GlobalExceptionHandlerTest.java` — added a `@Min(1)` test endpoint and a test asserting the handler now returns 400 instead of 500.
+
+Verified with `mvn test` — 149 tests, 0 failures, 0 errors, BUILD SUCCESS.
