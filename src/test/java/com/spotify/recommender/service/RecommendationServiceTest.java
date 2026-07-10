@@ -26,6 +26,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -151,6 +152,7 @@ class RecommendationServiceTest {
         assertThat(result.getTotal()).isEqualTo(2);
         assertThat(result.getTracks().get(0).getTrack().getId()).isEqualTo("a");
         assertThat(result.getTracks().get(0).getScore()).isEqualTo(1.0);
+        verify(spotifyApi, never()).addTracksToPlaylist(anyString(), anyList());
     }
 
     // ── stripMarkdownFence(): fenced input still parses ─────────────────────────

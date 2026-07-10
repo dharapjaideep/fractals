@@ -41,3 +41,9 @@ While writing the `UserController`/`PlaylistController` validation tests, found 
 - `src/test/java/com/spotify/recommender/exception/GlobalExceptionTestController.java` / `GlobalExceptionHandlerTest.java` — added a `@Min(1)` test endpoint and a test asserting the handler now returns 400 instead of 500.
 
 Verified with `mvn test` — 149 tests, 0 failures, 0 errors, BUILD SUCCESS.
+
+## 2026-07-10 — Address MEDIUM finding from 2026-07-10 review: lock in the H2 auto-save removal with a regression test
+
+- `src/test/java/com/spotify/recommender/service/RecommendationServiceTest.java` — added `verify(spotifyApi, never()).addTracksToPlaylist(anyString(), anyList());` to the `recommend()` happy-path test (`recommend_resolvesValidJsonArray_intoRankedTracks`). Per `reports/2026-07-10-1228-review.md`, the success-path test previously asserted the returned `RecommendationResponse` but never asserted the absence of the playlist write, so a future re-introduction of auto-save into `recommend()` — the exact regression fixed for HIGH finding H2 — would not have been caught by the suite.
+
+Verified with `mvn test` — 149 tests, 0 failures, 0 errors, BUILD SUCCESS.

@@ -196,7 +196,7 @@ Spotify credentials or live database needed.
 
 ### Test strategy
 
-The test suite (126 tests) covers:
+The test suite (149 tests) covers:
 
 - **MockWebServer** (OkHttp) for all Spotify API calls —
   tests run without Spotify credentials or network access
