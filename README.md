@@ -1,10 +1,4 @@
 # Fractals
-Note: The actual "product" of Fractals has moved far beyond this repository.
-Some of the code that I have added since I created this repo, I have withheld as proprietary.
-This repo represents the initial work that I did to demonstrate what is capable to implement
-with Claude Code and Agentic workflows etc...
-
-
 > Discover music that means something to you.
 
 ## Background
