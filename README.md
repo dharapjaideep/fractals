@@ -1,6 +1,7 @@
 # Fractals
 > Discover music that means something to you.
 
+Note: This README reflects the architecture and pipeline as of this repo's last public update. Since then, the product has evolved further — including graph-based taste clustering (Leiden algorithm) for deeper user profiling, which I've kept in a private continuation of the project, and Apple Music support alongside Spotify, which is built but not yet merged back into this repo. Happy to walk through the current version or share access on request.
 ## Background
 
 I built Fractals to learn a specific set of AI 
